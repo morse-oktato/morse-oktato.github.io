@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101820">
+<title>Morse-oktató – Vizuális sablonnal</title>
+<style>
+:root{color-scheme:dark;--bg:#101820;--panel:#1d2933;--line:#d7e2df;--green:#55e08a;--muted:#9eafb8}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#263b2a,#101820 65%);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#f4f7f5;min-height:100vh;padding:22px 14px 36px}
+main{max-width:620px;margin:auto}
+h1{text-align:center;font-size:1.55rem;margin:4px 0 5px}
+.sub{text-align:center;color:var(--muted);margin:0 0 20px;font-size:.95rem}
+.device{max-width:430px;margin:auto;background:#c5ccd0;border-radius:25px;padding:10px;box-shadow:0 18px 45px #0009}
+.screen{background:#17232b;border:2px solid #e0e6e5;border-radius:18px;padding:14px 12px 14px}
+.brand{display:flex;justify-content:space-between;align-items:center;color:#dce5e1;font-size:1.05rem;letter-spacing:.14em;font-weight:700;padding:0 6px}
+.lamp{width:13px;height:13px;border-radius:50%;background:#66736f;box-shadow:0 0 0 3px #ffffff18;transition:all .08s}
+.lamp.on{background:var(--green);box-shadow:0 0 15px var(--green)}
+
+/* SVG Sablon stílusok */
+.board-wrap{margin:10px auto 6px;max-width:360px}
+svg#morse-board{width:100%;height:auto;display:block;user-select:none}
+.wire{stroke:#aebbc0;stroke-width:2.6;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:stroke .15s, filter .15s}
+.wire.active{stroke:var(--green);filter:drop-shadow(0 0 4px var(--green))}
+.node-shape{fill:#17232b;stroke:#d7e2df;stroke-width:2.4;transition:fill .12s, stroke .12s, filter .12s}
+.node-group.active .node-shape{fill:var(--green);stroke:#ffffff;filter:drop-shadow(0 0 8px var(--green))}
+.node-group.visited .node-shape{fill:#2a5c3d;stroke:var(--green)}
+.node-label{fill:#dce5e1;font-family:system-ui,-apple-system,sans-serif;font-size:15px;font-weight:700;text-anchor:middle;dominant-baseline:central;transition:fill .12s}
+.node-group.active .node-label{fill:var(--green);filter:drop-shadow(0 0 6px #55e08a99)}
+
+.status-bar{display:flex;justify-content:space-between;align-items:center;background:#101920;border-radius:10px;padding:8px 12px;margin-top:8px;border:1px solid #2b3c46}
+.path{font-size:1.45rem;letter-spacing:.15em;color:var(--green);font-weight:700;min-height:30px;display:flex;align-items:center}
+.path .empty{font-size:.88rem;color:var(--muted);letter-spacing:0;font-weight:400}
+.current-char{font-size:1.7rem;font-weight:800;color:#fff;min-width:36px;text-align:right}
+.current-char.active{color:var(--green)}
+.treehint{text-align:center;color:#b8c8c2;font-size:.82rem;margin-top:9px;min-height:18px}
+
+.keyarea{padding:15px 8px 8px;text-align:center;color:#17232b}
+.key{width:108px;height:108px;border-radius:50%;border:7px solid #87949a;background:linear-gradient(145deg,#f9fbfb,#aeb9be);color:#18242b;font-size:1rem;font-weight:800;box-shadow:0 8px 0 #68767c,0 12px 18px #0007;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer}
+.key:active,.key.down{transform:translateY(5px);box-shadow:0 3px 0 #68767c,0 6px 12px #0007;background:linear-gradient(145deg,#d7f5e2,#8bcaa2)}
+.keylabel{font-size:.88rem;font-weight:650;margin:12px 0 2px;color:#17232b}
+.instruction{font-size:.76rem;color:#34444b;margin:0}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:17px auto;max-width:430px}
+button.secondary{border:1px solid #53646d;background:#263640;color:#f5f8f6;border-radius:10px;padding:10px 13px;font:inherit;cursor:pointer}
+button.secondary:active{background:#3b505b}
+.settings{display:flex;align-items:center;justify-content:center;gap:10px;color:#d6e0dc;font-size:.9rem;margin:10px auto 18px}
+.settings input{accent-color:var(--green);width:18px;height:18px}
+.info{max-width:540px;margin:18px auto;background:#1b2931;border:1px solid #3a4c54;border-radius:14px;padding:15px}
+.info h2{font-size:1.05rem;margin:0 0 9px}
+#decoded{font-size:1.25rem;min-height:35px;overflow-wrap:anywhere;letter-spacing:.06em}
+.hint{color:var(--muted);font-size:.85rem;line-height:1.5}
+details{max-width:540px;margin:14px auto;background:#1b2931;border:1px solid #3a4c54;border-radius:14px;padding:13px 15px}
+summary{cursor:pointer;font-weight:650}
+.chart{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}
+.chart div{background:#263640;border-radius:7px;padding:6px;text-align:center;font-size:.82rem}
+.chart b{display:block;color:var(--green);font-size:1rem}
+@media(max-width:380px){.screen{padding:12px 8px}.chart{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<main>
+<h1>Morse-oktató</h1>
+<p class="sub">Kövesd a fénypontot a betűsablonon!</p>
+
+<section class="device" aria-label="Morse készülék">
+  <div class="screen">
+    <div class="brand">
+      <span>MORSE</span>
+      <span class="lamp" id="lamp" title="Jelzőfény"></span>
+      <span>CODE</span>
+    </div>
+
+    <!-- A képen látható elágazó betűsablon pontos SVG mása -->
+    <div class="board-wrap">
+      <svg id="morse-board" viewBox="0 0 340 280" aria-label="Morse betűsablon">
+        <!-- Kiinduló antenna jel középen felül -->
+        <g id="start-node">
+          <polygon points="162,12 178,12 170,24" fill="none" stroke="#dce5e1" stroke-width="2"/>
+          <line x1="170" y1="12" x2="170" y2="38" class="wire" id="w-root"/>
+        </g>
+
+        <!-- Fő vízszintes elosztó sín (Balra: vonás [-], Jobbra: pont [.]) -->
+        <line x1="130" y1="38" x2="170" y2="38" class="wire" id="w--"/>
+        <line x1="80"  y1="38" x2="130" y2="38" class="wire" id="w---"/>
+        <line x1="30"  y1="38" x2="80"  y2="38" class="wire" id="w----"/>
+
+        <line x1="170" y1="38" x2="210" y2="38" class="wire" id="w-."/>
+        <line x1="210" y1="38" x2="250" y2="38" class="wire" id="w-.."/>
+        <line x1="250" y1="38" x2="290" y2="38" class="wire" id="w-..."/>
+        <line x1="290" y1="38" x2="322" y2="38" class="wire" id="w-...."/>
+
+        <!-- M (--) leágazás: G (--.), Z (--..), Q (--.-) -->
+        <line x1="80" y1="38" x2="80" y2="82" class="wire" id="w--."/>
+        <line x1="80" y1="82" x2="80" y2="118" class="wire" id="w--.."/>
+        <line x1="80" y1="82" x2="35" y2="82" class="wire" id="w--.-"/>
+
+        <!-- T (-) fő függőleges ág: N (-.), K (-.-), C (-.-.), Y (-.--) -->
+        <line x1="130" y1="38" x2="130" y2="148" class="wire" id="w-."/>
+        <line x1="130" y1="148" x2="80" y2="148" class="wire" id="w-.-"/>
+        <line x1="80"  y1="148" x2="80" y2="184" class="wire" id="w-.-."/>
+        <line x1="80"  y1="148" x2="35" y2="148" class="wire" id="w-.--"/>
+
+        <!-- N (-.) folytatás lefelé: D (-..), B (-...), X (-..-) -->
+        <line x1="130" y1="148" x2="130" y2="220" class="wire" id="w-.."/>
+        <line x1="130" y1="220" x2="130" y2="256" class="wire" id="w-..."/>
+        <line x1="130" y1="220" x2="80"  y2="220" class="wire" id="w-..-"/>
+
+        <!-- I (..) leágazás: U (..-), F (..-.) -->
+        <line x1="250" y1="38" x2="250" y2="82" class="wire" id="w-..-"/>
+        <line x1="250" y1="82" x2="250" y2="118" class="wire" id="w-..-."/>
+
+        <!-- S (...) leágazás: V (...-) -->
+        <line x1="290" y1="38" x2="290" y2="82" class="wire" id="w-...-"/>
+
+        <!-- E (.) fő függőleges ág: A (.-), R (.-.), L (.-..) -->
+        <line x1="210" y1="38" x2="210" y2="148" class="wire" id="w-.-"/>
+        <line x1="210" y1="148" x2="250" y2="148" class="wire" id="w-.-."/>
+        <line x1="250" y1="148" x2="290" y2="148" class="wire" id="w-.-.."/>
+
+        <!-- A (.-) folytatás lefelé: W (.--), P (.--.), J (.---) -->
+        <line x1="210" y1="148" x2="210" y2="220" class="wire" id="w-.--"/>
+        <line x1="210" y1="220" x2="250" y2="220" class="wire" id="w-.--."/>
+        <line x1="210" y1="220" x2="210" y2="256" class="wire" id="w-.---"/>
+
+        <!-- CSOMÓPONTOK (Téglalap = vonás végű, Kör = pont végű, pont úgy mint a fotón!) -->
+        
+        <!-- Felső sor: O, M, T  |  E, I, S, H -->
+        <g class="node-group" id="node----">
+          <text x="30" y="20" class="node-label">O</text>
+          <rect x="21" y="33" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node---">
+          <text x="80" y="20" class="node-label">M</text>
+          <rect x="71" y="33" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--">
+          <text x="130" y="20" class="node-label">T</text>
+          <rect x="121" y="33" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+
+        <g class="node-group" id="node-.">
+          <text x="210" y="20" class="node-label">E</text>
+          <circle cx="210" cy="38" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-..">
+          <text x="250" y="20" class="node-label">I</text>
+          <circle cx="250" cy="38" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-...">
+          <text x="290" y="20" class="node-label">S</text>
+          <circle cx="290" cy="38" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-....">
+          <text x="322" y="20" class="node-label">H</text>
+          <circle cx="322" cy="38" r="6.5" class="node-shape"/>
+        </g>
+
+        <!-- M alatti ág: G, Q, Z -->
+        <g class="node-group" id="node---.">
+          <text x="100" y="82" class="node-label">G</text>
+          <circle cx="80" cy="82" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node---.-">
+          <text x="35" y="101" class="node-label">Q</text>
+          <rect x="26" y="77" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node---..">
+          <text x="100" y="118" class="node-label">Z</text>
+          <circle cx="80" cy="118" r="6.5" class="node-shape"/>
+        </g>
+
+        <!-- I és S alatti ág: U, F, V -->
+        <g class="node-group" id="node-..-">
+          <text x="232" y="82" class="node-label">U</text>
+          <rect x="245" y="73" width="10" height="18" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-..-.">
+          <text x="270" y="118" class="node-label">F</text>
+          <circle cx="250" cy="118" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-...-">
+          <text x="309" y="82" class="node-label">V</text>
+          <rect x="285" y="73" width="10" height="18" rx="2" class="node-shape"/>
+        </g>
+
+        <!-- Középső sor: Y, K, C, N  |  A, R, L -->
+        <g class="node-group" id="node--.--">
+          <text x="35" y="131" class="node-label">Y</text>
+          <rect x="26" y="143" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--.-">
+          <text x="80" y="131" class="node-label">K</text>
+          <rect x="71" y="143" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--.-.">
+          <text x="99" y="184" class="node-label">C</text>
+          <circle cx="80" cy="184" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--.">
+          <text x="149" y="142" class="node-label">N</text>
+          <circle cx="130" cy="148" r="6.5" class="node-shape"/>
+        </g>
+
+        <g class="node-group" id="node-.-">
+          <text x="192" y="153" class="node-label">A</text>
+          <rect x="205" y="139" width="10" height="18" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-.-.">
+          <text x="250" y="167" class="node-label">R</text>
+          <circle cx="250" cy="148" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-.-..">
+          <text x="308" y="148" class="node-label">L</text>
+          <circle cx="290" cy="148" r="6.5" class="node-shape"/>
+        </g>
+
+        <!-- Alsó sor: X, D, B  |  W, P, J -->
+        <g class="node-group" id="node--..-">
+          <text x="58" y="220" class="node-label">X</text>
+          <rect x="71" y="215" width="18" height="10" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--..">
+          <text x="149" y="214" class="node-label">D</text>
+          <circle cx="130" cy="220" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node--...">
+          <text x="111" y="256" class="node-label">B</text>
+          <circle cx="130" cy="256" r="6.5" class="node-shape"/>
+        </g>
+
+        <g class="node-group" id="node-.--">
+          <text x="191" y="225" class="node-label">W</text>
+          <rect x="205" y="211" width="10" height="18" rx="2" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-.--.">
+          <text x="270" y="220" class="node-label">P</text>
+          <circle cx="250" cy="220" r="6.5" class="node-shape"/>
+        </g>
+        <g class="node-group" id="node-.---">
+          <text x="228" y="256" class="node-label">J</text>
+          <rect x="205" y="247" width="10" height="18" rx="2" class="node-shape"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Aktuális jel és betű kijelző sáv -->
+    <div class="status-bar">
+      <div class="path" id="path"><span class="empty">Nyomd meg a gombot!</span></div>
+      <div class="current-char" id="live-char">—</div>
+    </div>
+    <div class="treehint" id="treehint">Balra: vonás (−) &nbsp;|&nbsp; Jobbra: pont (·)</div>
+  </div>
+
+  <div class="keyarea">
+    <button class="key" id="key" type="button" aria-label="Morse nyomógomb">NYOMD</button>
+    <div class="keylabel">MORSE NYOMÓGOMB</div>
+    <p class="instruction">Rövid nyomás = pont (·) &nbsp;•&nbsp; Hosszú = vonás (−)</p>
+  </div>
+</section>
+
+<div class="controls">
+  <button class="secondary" id="finish">Betű kész</button>
+  <button class="secondary" id="space">Szóköz</button>
+  <button class="secondary" id="back">Utolsó törlése</button>
+  <button class="secondary" id="clear">Mindent töröl</button>
+</div>
+<label class="settings"><input type="checkbox" id="sound" checked> Hangjelzés bekapcsolva</label>
+
+<section class="info">
+  <h2>Leírt szöveg</h2>
+  <div id="decoded" aria-live="polite"></div>
+  <p class="hint">Egy betű jeleit egymás után add meg: a sablonon a zöld fény mutatja, merre haladsz. A betű 2,2 másodperc szünet után automatikusan rögzül (vagy nyomd meg a „Betű kész” gombot).</p>
+</section>
+
+<details>
+  <summary>Morse ábécé – teljes táblázat (számokkal)</summary>
+  <div class="chart" id="chart"></div>
+</details>
+</main>
+
+<script>
+const MORSE={
+ A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',
+ K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',
+ U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',
+ '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....',
+ '6':'-....','7':'--...','8':'---..','9':'----.'
+};
+const reverse=Object.fromEntries(Object.entries(MORSE).map(([k,v])=>[v,k]));
+
+const key=document.getElementById('key'),
+      pathEl=document.getElementById('path'),
+      liveCharEl=document.getElementById('live-char'),
+      decodedEl=document.getElementById('decoded'),
+      lamp=document.getElementById('lamp'),
+      hint=document.getElementById('treehint');
+
+let downAt=0, pressing=false, current='', decoded='', timer=null, audio=null;
+const DOT_LIMIT=260, LETTER_GAP=2200;
+
+function beep(ms){
+  if(!document.getElementById('sound').checked)return;
+  try{
+    audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+    if(audio.state==='suspended')audio.resume();
+    const osc=audio.createOscillator(),gain=audio.createGain();
+    osc.frequency.value=650;gain.gain.value=.08;
+    osc.connect(gain);gain.connect(audio.destination);
+    osc.start();osc.stop(audio.currentTime+ms/1000);
+  }catch(e){}
+}
+
+// SVG betűsablon frissítése
+function updateBoard(seq){
+  document.querySelectorAll('.node-group').forEach(el=>el.classList.remove('active','visited'));
+  document.querySelectorAll('.wire').forEach(el=>el.classList.remove('active'));
+
+  if(!seq) return;
+
+  const rootWire = document.getElementById('w-root');
+  if(rootWire) rootWire.classList.add('active');
+
+  // Útvonal minden köztes lépésének megvilágítása
+  for(let i=1; i<=seq.length; i++){
+    const prefix = seq.slice(0, i);
+    const node = document.getElementById('node-' + prefix);
+    const wire = document.getElementById('w' + prefix);
+    if(wire) wire.classList.add('active');
+    if(node){
+      if(i === seq.length) node.classList.add('active');
+      else node.classList.add('visited');
+    }
+  }
+}
+
+function render(){
+  if(current){
+    pathEl.textContent = current.replace(/\./g,'·').replace(/-/g,'−');
+    const match = reverse[current];
+    liveCharEl.textContent = match || '?';
+    liveCharEl.classList.toggle('active', Boolean(match));
+  } else {
+    pathEl.innerHTML = '<span class="empty">Nyomd meg a gombot!</span>';
+    liveCharEl.textContent = '—';
+    liveCharEl.classList.remove('active');
+  }
+  updateBoard(current);
+}
+
+function commit(){
+  if(!current)return;
+  const letter=reverse[current]||'?';
+  hint.textContent = letter==='?'
+    ? 'Ismeretlen jelsorozat – próbáld újra!'
+    : `Rögzítve: „${letter}” (${current.replace(/\./g,'·').replace(/-/g,'−')})`;
+  decoded+=letter;
+  decodedEl.textContent=decoded;
+  current='';
+  render();
+  clearTimeout(timer);
+}
+
+function schedule(){
+  clearTimeout(timer);
+  timer=setTimeout(commit,LETTER_GAP);
+}
+
+function start(e){
+  if(e)e.preventDefault();
+  if(pressing)return;
+  pressing=true;
+  downAt=performance.now();
+  key.classList.add('down');
+  lamp.classList.add('on');
+  try{key.setPointerCapture(e.pointerId)}catch(_){}
+}
+
+function end(e){
+  if(!pressing)return;
+  pressing=false;
+  const duration=performance.now()-downAt;
+  key.classList.remove('down');
+  lamp.classList.remove('on');
+  const isDot=duration<DOT_LIMIT;
+  current+=isDot?'.':'-';
+  beep(isDot?100:330);
+  const match=reverse[current];
+  hint.textContent = (isDot?'Rövid: pont (·)':'Hosszú: vonás (−)') + (match ? ` → Jelenlegi betű: ${match}` : '');
+  render();
+  schedule();
+}
+
+key.addEventListener('pointerdown',start);
+key.addEventListener('pointerup',end);
+key.addEventListener('pointercancel',end);
+key.addEventListener('contextmenu',e=>e.preventDefault());
+
+document.getElementById('finish').onclick=()=>{clearTimeout(timer);commit();};
+document.getElementById('space').onclick=()=>{
+  clearTimeout(timer);commit();
+  if(decoded&&!decoded.endsWith(' ')){decoded+=' ';decodedEl.textContent=decoded;}
+};
+document.getElementById('back').onclick=()=>{
+  clearTimeout(timer);
+  if(current){current=current.slice(0,-1);render();}
+  else{decoded=decoded.slice(0,-1);decodedEl.textContent=decoded;}
+};
+document.getElementById('clear').onclick=()=>{
+  clearTimeout(timer);current='';decoded='';decodedEl.textContent='';
+  hint.textContent='Balra: vonás (−)  |  Jobbra: pont (·)';
+  render();
+};
+
+document.addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  if(e.code==='Space'&&!['BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();start();}
+});
+document.addEventListener('keyup',e=>{if(e.code==='Space'&&pressing)end();});
+
+document.getElementById('chart').innerHTML=Object.entries(MORSE)
+  .map(([k,v])=>`<div><b>${k}</b>${v.replace(/\./g,'·').replace(/-/g,'−')}</div>`).join('');
+</script>
+</body>
+</html>
