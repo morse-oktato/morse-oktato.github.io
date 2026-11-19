@@ -421,6 +421,7 @@ document.addEventListener('keyup',e=>{if(e.code==='Space'&&pressing)end();});
 document.getElementById('chart').innerHTML=Object.entries(MORSE)
   .map(([k,v])=>`<div><b>${k}</b>${v.replace(/\./g,'·').replace(/-/g,'−')}</div>`).join('');
 </script>
+  <center>
   Készítette:Szijártó Péter
 </body>
 </html>
